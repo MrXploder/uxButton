@@ -12,8 +12,8 @@ ESP8266WiFiMulti wifiMulti;
 
 #define TARGET_HOSTNAME "uxrelay1.local"
 
-const char *ssid = "Jumpitt Labs";
-const char *password = "Jumpitt2015";
+String targetHostName = "";
+
 const char *mdnsName = "uxbutton1";
 String targetIp = "";
 
@@ -34,13 +34,26 @@ void setup() {
 }
 
 void loop() {
-  if(makeAToggle){
-    Serial.println("getting wait!");
-    http.GET();
+  if(makeAToggle && WiFi.status() == WL_CONNECTED){
+    HTTPClient http;
+
+    http.begin(targetHostName);
+    int httpcode = http.GET();
+
+    Serial.println(httpcode);
+
+    if(httpcode > 0){
+      String payload = http.getString();
+      Serial.println(payload);
+    }
+    else {
+      Serial.println(http.errorToString(httpcode).c_str());
+    }
+
     http.end();
     Serial.println("done!");
     makeAToggle = false;
-    delay(200);
+    delay(1000);
     attachInterrupt(digitalPinToInterrupt(D3), interruption, FALLING);
   }
 }
@@ -56,6 +69,8 @@ String resolveMDNS(){
 
 void startWiFi() {
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoConnect (true);
+  WiFi.setAutoReconnect (true);
   wifiMulti.addAP("Jumpitt Labs", "Jumpitt2015");
   wifiMulti.addAP("VTR-7236151", "hw9wcXhtHsm4");
 
@@ -72,33 +87,14 @@ void startWiFi() {
 }
 
 void startHttpClient(){
-  Serial.print("starting http at ");
-  Serial.println(resolveMDNS());
-  http.begin(resolveMDNS());
-}
-
-bool resolve_mdns_service(char* service_name, char* protocol, char* desired_host, IPAddress* ip_addr, uint16_t *port_number) {
-  Serial.println("Sending mDNS query");
-  int n = MDNS.queryService(service_name, protocol);
-  Serial.printf("mDNS query got %d results\n", n);
-
-  if(n == 0) {
-    Serial.println("no services found");
-  } else {
-    for (int i = 0; i < n; ++i) {
-      if(strcmp(MDNS.hostname(i).c_str(), desired_host) == 0) {
-        *ip_addr = MDNS.IP(i);
-        *port_number = MDNS.port(i);
-        return true;
-      }
-    }
-  }
-  return false;
+  Serial.print("starting http at =>");
+  targetHostName = resolveMDNS();
+  Serial.println(targetHostName);
+  http.begin(targetHostName);
 }
 
 void interruption(){
  detachInterrupt(digitalPinToInterrupt(D3));
- Serial.println("button pressed!");
  makeAToggle = true;
 }
 
